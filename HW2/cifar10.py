@@ -222,11 +222,11 @@ def inference(images):
   # conv2
   with tf.variable_scope('conv2') as scope:
     kernel = _variable_with_weight_decay('weights',
-                                         shape=[5, 5, 64, 64],
+                                         shape=[5, 5, 64, 30],
                                          stddev=5e-2,
                                          wd=None)
     conv = tf.nn.conv2d(norm1, kernel, [1, 1, 1, 1], padding='SAME')
-    biases = _variable_on_cpu('biases', [64], tf.constant_initializer(0.1))
+    biases = _variable_on_cpu('biases', [30], tf.constant_initializer(0.1))
     pre_activation = tf.nn.bias_add(conv, biases)
     conv2 = tf.nn.relu(pre_activation, name=scope.name)
     _activation_summary(conv2)
@@ -243,17 +243,17 @@ def inference(images):
     # Move everything into depth so we can perform a single matrix multiply.
     reshape = tf.reshape(pool2, [images.get_shape().as_list()[0], -1])
     dim = reshape.get_shape()[1].value
-    weights = _variable_with_weight_decay('weights', shape=[dim, 100],
+    weights = _variable_with_weight_decay('weights', shape=[dim, 30],
                                           stddev=0.04, wd=0.004)
-    biases = _variable_on_cpu('biases', [100], tf.constant_initializer(0.1))
+    biases = _variable_on_cpu('biases', [30], tf.constant_initializer(0.1))
     local3 = tf.nn.relu(tf.matmul(reshape, weights) + biases, name=scope.name)
     _activation_summary(local3)
 
   # local4
   with tf.variable_scope('local4') as scope:
-    weights = _variable_with_weight_decay('weights', shape=[100, 100],
+    weights = _variable_with_weight_decay('weights', shape=[30, 30],
                                           stddev=0.04, wd=0.004)
-    biases = _variable_on_cpu('biases', [100], tf.constant_initializer(0.1))
+    biases = _variable_on_cpu('biases', [30], tf.constant_initializer(0.1))
     local4 = tf.nn.relu(tf.matmul(local3, weights) + biases, name=scope.name)
     _activation_summary(local4)
 
@@ -262,7 +262,7 @@ def inference(images):
   # tf.nn.sparse_softmax_cross_entropy_with_logits accepts the unscaled logits
   # and performs the softmax internally for efficiency.
   with tf.variable_scope('softmax_linear') as scope:
-    weights = _variable_with_weight_decay('weights', [100, NUM_CLASSES],
+    weights = _variable_with_weight_decay('weights', [30, NUM_CLASSES],
                                           stddev=1/192.0, wd=None)
     biases = _variable_on_cpu('biases', [NUM_CLASSES],
                               tf.constant_initializer(0.0))

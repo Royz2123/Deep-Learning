@@ -50,7 +50,7 @@ EPOCHS = 200
 EPOCH_SIZE = 200
 FLAGS = tf.app.flags.FLAGS
 
-tf.app.flags.DEFINE_string('train-dir', '/tmp/cifar10_train3',
+tf.app.flags.DEFINE_string('train-dir', '/tmp/cifar10_train_prox',
                            """Directory where to write event logs """
                            """and checkpoint.""")
 tf.app.flags.DEFINE_string('eval-data', 'test',
@@ -63,7 +63,7 @@ tf.app.flags.DEFINE_integer('log_frequency', 10,
                             """How often to log results to the console.""")
 
 
-def train_and_test(saver, top_k_op):
+def my_train(saver):
 
     #print ('%s: precision @ 1 = %.3f' % (datetime.now(), precision))
     with tf.Graph().as_default():
@@ -81,6 +81,9 @@ def train_and_test(saver, top_k_op):
 
         # Calculate loss.
         loss = cifar10.loss(logits, labels)
+
+        # create vars for eval
+        top_k_op = tf.nn.in_top_k(logits, labels, 1)
 
         # Build a Graph that trains the model with one batch of examples and
         # updates the model parameters.
@@ -135,14 +138,14 @@ def train_and_test(saver, top_k_op):
                 mon_sess.run(train_op)
                 train_res = logger.get_results()
 
-
-    test_res = cifar10_eval.simple_eval_once(saver, top_k_op)
-    return train_res, test_res
-
-
+        # train_acc = cifar10_eval.simple_eval_once(saver, top_k_op)["accuracy"]
+        train_res["accuracy"] = 0
+    return train_res
 
 
-def train():
+
+'''
+def train(saver):
   """Train CIFAR-10 for a number of steps."""
   with tf.Graph().as_default():
     global_step = tf.train.get_or_create_global_step()
@@ -202,7 +205,7 @@ def train():
     with tf.train.MonitoredTrainingSession(
         checkpoint_dir=FLAGS.train_dir,
         save_checkpoint_secs=60,
-        hooks=[tf.train.StopAtStepHook(last_step=FLAGS.epoch_steps),
+        hooks=[tf.train.StopAtStepHook(last_step=FLAGS.max_steps),
                tf.train.NanTensorHook(loss),
                logger],
         config=tf.ConfigProto(
@@ -210,8 +213,14 @@ def train():
       while not mon_sess.should_stop():
         mon_sess.run(train_op)
 
-    return logger.get_results()
+    # create vars for eval
+    top_k_op = tf.nn.in_top_k(logits, labels, 1)
+    train_loss = cifar10.loss(logits, labels)
 
+    train_res = cifar10_eval.simple_eval_once(saver, top_k_op, train_loss)
+    print train_res
+    return logger.get_results()
+'''
 
 def main(argv=None):  # pylint: disable=unused-argument
     cifar10.maybe_download_and_extract()
@@ -229,6 +238,7 @@ def main(argv=None):  # pylint: disable=unused-argument
 
     # Calculate predictions.
     top_k_op = tf.nn.in_top_k(logits, labels, 1)
+    test_loss = cifar10.loss(logits, labels)
 
     # Restore the moving average version of the learned variables for eval.
     variable_averages = tf.train.ExponentialMovingAverage(
@@ -239,16 +249,28 @@ def main(argv=None):  # pylint: disable=unused-argument
 
     total_train_loss = []
     total_test_acc = []
+    total_test_loss = []
+    total_train_acc = []
     for i in range(EPOCHS):
-        train_res, test_res = train_and_test(saver, top_k_op)
+        print("EPOCH: ", (i+1), "/", EPOCHS)
+        train_res = my_train(saver)
+        test_res = cifar10_eval.simple_eval_once(saver, top_k_op, test_loss)
 
         total_train_loss.append(sum(train_res["loss"]) / len(train_res["loss"]))
+        total_train_acc.append(train_res["accuracy"])
+
+        total_test_loss.append(test_res["loss"])
         total_test_acc.append(test_res["accuracy"])
 
-        print(total_train_loss)
-        print(total_test_acc)
+        print("TRAIN LOSS ", total_train_loss)
+        print("TRAIN ACC ", total_train_acc)
+        print("TEST LOSS ", total_test_loss)
+        print("TEST ACC ", total_test_acc)
+
+        print("CURR ACC: ", total_test_acc[-1])
 
     # plot figures
+    # plt.plot(range(EPOCHS), total_train_acc)
     plt.plot(range(EPOCHS), total_test_acc)
     plt.title("Accuracy per epoch")
     plt.xlabel("Epoch")
@@ -256,6 +278,7 @@ def main(argv=None):  # pylint: disable=unused-argument
     plt.show()
 
     plt.plot(range(EPOCHS), total_train_loss)
+    # plt.plot(range(EPOCHS), total_test_loss)
     plt.title("Loss per epoch")
     plt.xlabel("Epoch")
     plt.ylabel("Loss")

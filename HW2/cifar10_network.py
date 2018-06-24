@@ -24,39 +24,39 @@ def conv2d(x, W):
 
 def max_pool_2x2(x):
   return tf.nn.max_pool(x, ksize=[1, 2, 2, 1],strides=[1, 2, 2, 1], padding='SAME')
-  
+
 def model():
-    
+
     _IMAGE_SIZE = 32
     _IMAGE_CHANNELS = 3
     _NUM_CLASSES = 10
 
- 
+
     x = tf.placeholder(tf.float32, shape=[None, _IMAGE_SIZE * _IMAGE_SIZE * _IMAGE_CHANNELS], name='Input')
     y = tf.placeholder(tf.float32, shape=[None, _NUM_CLASSES], name='Output')
     x_image = tf.reshape(x, [-1, _IMAGE_SIZE, _IMAGE_SIZE, _IMAGE_CHANNELS], name='images')
     #keep_prob1 = tf.placeholder(tf.float32 , name ="koko1")
-    keep_prob2 = tf.placeholder(tf.float32 , name ="koko2")    
+    keep_prob2 = tf.placeholder(tf.float32 , name ="koko2")
 
     w1 = weight_variable([3,3,3,32])
     b1 = bias_variable([32])
-    conv1 = tf.nn.relu(conv2d(x_image, w1) + b1)    
+    conv1 = tf.nn.relu(conv2d(x_image, w1) + b1)
     w1_1 = weight_variable([3,3,32,64])
     b1_1 = bias_variable([64])
-    conv = tf.nn.relu(conv2d(conv1, w1_1) + b1_1)    
+    conv = tf.nn.relu(conv2d(conv1, w1_1) + b1_1)
     pool = max_pool_2x2(conv)
     drop = tf.nn.dropout(pool, keep_prob2)
 
-    
+
     w2 = weight_variable([3,3,64,128])
     b2 = bias_variable([128])
-    conv2 = tf.nn.relu(conv2d(drop, w2) + b2)    
+    conv2 = tf.nn.relu(conv2d(drop, w2) + b2)
     pool2 = max_pool_2x2(conv2)
 
-    
+
     w3 = weight_variable([2,2,128,128])
     b3 = bias_variable([128])
-    conv3 = tf.nn.relu(conv2d(pool2, w3) + b3)    
+    conv3 = tf.nn.relu(conv2d(pool2, w3) + b3)
     pool3 = max_pool_2x2(conv3)
     drop3 = tf.nn.dropout(pool3, keep_prob2)
 
@@ -74,15 +74,15 @@ def model():
     y_pred_cls = tf.argmax(softmax, axis=1)
 
     loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits_v2(logits=softmax, labels=y))
-     
-    optimizer = tf.train.AdamOptimizer(1e-4  , beta1=0.9,   
+
+    optimizer = tf.train.ProximalGradientDescentOptimizer(1e-4  , beta1=0.9,
                                 beta2=0.999,
                                epsilon=1e-08).minimize(loss)
 
     # PREDICTION AND ACCURACY CALCULATION
     correct_prediction = tf.equal(y_pred_cls, tf.argmax(y, axis=1))
     accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
- 
+
     return    x, y, loss ,optimizer , correct_prediction ,accuracy, y_pred_cls   ,keep_prob2
 
 
@@ -223,8 +223,8 @@ def test_and_save( epoch):
 
     print("###########################################################################################################")
 
-    
-    
+
+
 
 sess = tf.Session()
 

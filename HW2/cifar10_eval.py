@@ -45,11 +45,11 @@ import cifar10
 
 FLAGS = tf.app.flags.FLAGS
 
-tf.app.flags.DEFINE_string('eval_dir', '/tmp/cifar10_eval3',
+tf.app.flags.DEFINE_string('eval_dir', 'models/cifar10_model_dir',
                            """Directory where to write event logs.""")
 tf.app.flags.DEFINE_string('eval_data', 'test',
                            """Either 'test' or 'train_eval'.""")
-tf.app.flags.DEFINE_string('checkpoint_dir', '/tmp/cifar10_train3',
+tf.app.flags.DEFINE_string('checkpoint_dir', 'models/cifar10_prox',
                            """Directory where to read model checkpoints.""")
 tf.app.flags.DEFINE_integer('eval_interval_secs', 15,
                             """How often to run the eval.""")
@@ -59,7 +59,7 @@ tf.app.flags.DEFINE_boolean('run_once', False,
                          """Whether to run eval only once.""")
 
 
-def eval_once(saver, summary_writer, top_k_op, summary_op):
+def eval_once(saver, summary_writer, top_k_op, summary_op, loss=None):
   """Run Eval once.
 
   Args:
@@ -101,7 +101,11 @@ def eval_once(saver, summary_writer, top_k_op, summary_op):
 
       # Compute precision @ 1.
       precision = true_count / total_sample_count
-      print('%s: precision @ 1 = %.3f' % (datetime.now(), precision))
+      print('precision @ 1 = %.3f' % (precision))
+
+      if loss is not None:
+          loss_float = sess.run([loss])
+          print('loss @ 1 = %.3f' % (loss_float[0]))
 
       summary = tf.Summary()
       summary.ParseFromString(sess.run(summary_op))
@@ -113,14 +117,12 @@ def eval_once(saver, summary_writer, top_k_op, summary_op):
     coord.request_stop()
     coord.join(threads, stop_grace_period_secs=10)
 
-def simple_eval_once(saver, top_k_op):
+def simple_eval_once(saver, top_k_op, test_loss=None):
   """Run Eval once.
 
   Args:
     saver: Saver.
-    summary_writer: Summary writer.
     top_k_op: Top K op.
-    summary_op: Summary op.
   """
 
   with tf.Session() as sess:
@@ -153,8 +155,13 @@ def simple_eval_once(saver, top_k_op):
         true_count += np.sum(predictions)
         step += 1
 
+
       # Compute precision @ 1.
       precision = true_count / total_sample_count
+      loss = None
+      if test_loss is not None:
+          loss = sess.run(test_loss)
+
 
     except Exception as e:  # pylint: disable=broad-except
       coord.request_stop(e)
@@ -164,7 +171,7 @@ def simple_eval_once(saver, top_k_op):
 
     return {
         "accuracy" : precision,
-
+        "loss" : loss
     }
 
 
@@ -182,6 +189,9 @@ def evaluate():
     # Calculate predictions.
     top_k_op = tf.nn.in_top_k(logits, labels, 1)
 
+    # Calculate loss.
+    loss = cifar10.loss(logits, labels)
+
     # Restore the moving average version of the learned variables for eval.
     variable_averages = tf.train.ExponentialMovingAverage(
         cifar10.MOVING_AVERAGE_DECAY)
@@ -193,11 +203,7 @@ def evaluate():
 
     summary_writer = tf.summary.FileWriter(FLAGS.eval_dir, g)
 
-    while True:
-      eval_once(saver, summary_writer, top_k_op, summary_op)
-      if FLAGS.run_once:
-        break
-      time.sleep(FLAGS.eval_interval_secs)
+    eval_once(saver, summary_writer, top_k_op, summary_op, loss)
 
 
 def main(argv=None):  # pylint: disable=unused-argument
